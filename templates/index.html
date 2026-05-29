@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChurnGenius — AI Retention Analytics Platform</title>
+  <meta name="description" content="Enterprise-grade customer churn prediction and retention analytics powered by XGBoost and SHAP explainable AI. No login required.">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+  <!-- ═══ TOP NAVIGATION BAR ═══ -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        ChurnGenius
+        <span class="brand-sub">AI Analytics</span>
+      </div>
+    </div>
+
+    <nav class="topbar-nav" role="navigation" aria-label="Main navigation">
+      <button class="tab-btn active" id="tab-dashboard" onclick="switchTab('dashboard')" aria-selected="true">
+        <span class="tab-icon">📊</span> Dashboard
+      </button>
+      <button class="tab-btn" id="tab-predict" onclick="switchTab('predict')" aria-selected="false">
+        <span class="tab-icon">🔮</span> Predict
+      </button>
+      <button class="tab-btn" id="tab-batch" onclick="switchTab('batch')" aria-selected="false">
+        <span class="tab-icon">📂</span> Batch Analysis
+      </button>
+      <button class="tab-btn" id="tab-insights" onclick="switchTab('insights')" aria-selected="false">
+        <span class="tab-icon">🧠</span> Insights
+      </button>
+    </nav>
+
+    <div class="topbar-right">
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        Model Online
+      </div>
+    </div>
+  </header>
+
+  <!-- ═══ APP BODY ═══ -->
+  <div class="app-body">
+
+    <!-- ════════════════════════════════
+         TAB 1: DASHBOARD
+         ════════════════════════════════ -->
+    <div class="tab-panel active" id="panel-dashboard" role="tabpanel">
+      <div class="dashboard-layout">
+
+        <!-- Stat Cards -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header">
+              <div class="stat-label">Overall Churn Rate</div>
+              <div class="stat-icon purple">📉</div>
+            </div>
+            <div class="stat-value" id="statChurn">--</div>
+            <div class="stat-sub">of total customer base</div>
+          </div>
+
+          <div class="stat-card success-card">
+            <div class="stat-header">
+              <div class="stat-label">Avg. Revenue / User</div>
+              <div class="stat-icon cyan">💰</div>
+            </div>
+            <div class="stat-value" id="statRevenue">--</div>
+            <div class="stat-sub">monthly per customer</div>
+          </div>
+
+          <div class="stat-card danger-card">
+            <div class="stat-header">
+              <div class="stat-label">Customers at Risk</div>
+              <div class="stat-icon red">⚠️</div>
+            </div>
+            <div class="stat-value" id="statRisk">--</div>
+            <div class="stat-sub">month-to-month contracts</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-header">
+              <div class="stat-label">Total Customers</div>
+              <div class="stat-icon green">👥</div>
+            </div>
+            <div class="stat-value" id="statTotal">--</div>
+            <div class="stat-sub">in current dataset</div>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+          <!-- Contract Churn Chart -->
+          <div class="chart-card">
+            <div class="chart-card-title">⚖️ Churn Rate by Contract Type</div>
+            <div class="chart-wrapper">
+              <canvas id="contractChurnChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Risk Distribution Donut -->
+          <div class="chart-card">
+            <div class="chart-card-title">🎯 Risk Distribution</div>
+            <div class="chart-wrapper">
+              <canvas id="riskDonutChart"></canvas>
+            </div>
+            <div class="risk-legend" id="riskLegend">
+              <div class="risk-legend-item">
+                <span class="risk-legend-label"><span class="risk-legend-dot" style="background:#ff4d6d"></span>Critical</span>
+                <span class="risk-legend-value" id="legendCritical">--</span>
+              </div>
+              <div class="risk-legend-item">
+                <span class="risk-legend-label"><span class="risk-legend-dot" style="background:#f7c948"></span>High</span>
+                <span class="risk-legend-value" id="legendHigh">--</span>
+              </div>
+              <div class="risk-legend-item">
+                <span class="risk-legend-label"><span class="risk-legend-dot" style="background:#ff8c42"></span>Medium</span>
+                <span class="risk-legend-value" id="legendMedium">--</span>
+              </div>
+              <div class="risk-legend-item">
+                <span class="risk-legend-label"><span class="risk-legend-dot" style="background:#00d2a0"></span>Low</span>
+                <span class="risk-legend-value" id="legendLow">--</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Revenue at Risk -->
+          <div class="chart-card">
+            <div class="chart-card-title">💸 Revenue at Risk</div>
+            <div class="revenue-meter">
+              <div class="meter-row">
+                <span>Monthly at-risk revenue</span>
+                <span class="meter-val" id="revenueAtRisk">--</span>
+              </div>
+              <div class="meter-bar-bg">
+                <div class="meter-bar-fill" id="revenueBar" style="width:0%"></div>
+              </div>
+              <div style="font-size:0.75rem;color:var(--text-muted)">% of total monthly revenue</div>
+
+              <div style="margin-top:20px">
+                <div class="chart-card-title" style="margin-bottom:10px">🌐 Internet Service Churn</div>
+                <div class="chart-wrapper" style="min-height:120px">
+                  <canvas id="internetChurnChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prediction History -->
+        <div class="history-section">
+          <div class="section-title">🕐 Recent Prediction History</div>
+          <div class="table-wrap">
+            <table id="historyTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Contract</th>
+                  <th>Tenure</th>
+                  <th>Monthly ($)</th>
+                  <th>Churn Prob.</th>
+                  <th>Risk Level</th>
+                  <th>Action</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="historyBody">
+                <tr>
+                  <td colspan="8" class="empty-table">No predictions yet — run an analysis in the Predict tab.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════
+         TAB 2: PREDICT
+         ════════════════════════════════ -->
+    <div class="tab-panel" id="panel-predict" role="tabpanel">
+      <div class="predict-layout">
+
+        <!-- Sidebar Form -->
+        <aside class="predict-sidebar">
+          <div style="font-family:'Outfit',sans-serif;font-size:1rem;font-weight:700;margin-bottom:4px;">Customer Profile</div>
+          <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:8px;">Fill in the customer details below</div>
+
+          <form id="predictionForm" autocomplete="off">
+
+            <div class="sidebar-section-title">📋 Contract Info</div>
+
+            <div class="form-group">
+              <label for="Contract">Contract Type</label>
+              <select id="Contract" name="Contract" required>
+                <option value="Month-to-month">Month-to-month</option>
+                <option value="One year">One year</option>
+                <option value="Two year">Two year</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="tenure">Tenure (Months)</label>
+              <input type="number" id="tenure" name="tenure" value="12" min="0" max="72">
+            </div>
+
+            <div class="form-group">
+              <label for="MonthlyCharges">Monthly Charges ($)</label>
+              <input type="number" id="MonthlyCharges" name="MonthlyCharges" value="70.00" step="0.5">
+            </div>
+
+            <div class="form-group">
+              <label for="TotalCharges">Total Charges ($)</label>
+              <input type="number" id="TotalCharges" name="TotalCharges" value="840.00" step="1.0">
+            </div>
+
+            <div class="sidebar-section-title">🌐 Services</div>
+
+            <div class="form-group">
+              <label for="InternetService">Internet Service</label>
+              <select id="InternetService" name="InternetService">
+                <option value="Fiber optic">Fiber optic</option>
+                <option value="DSL">DSL</option>
+                <option value="No">No internet</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="TechSupport">Tech Support</label>
+              <div class="toggle-group" id="TechSupportToggle">
+                <button type="button" class="toggle-opt selected" data-val="No" onclick="setToggle('TechSupport','No',this)">No</button>
+                <button type="button" class="toggle-opt" data-val="Yes" onclick="setToggle('TechSupport','Yes',this)">Yes</button>
+              </div>
+              <input type="hidden" id="TechSupport" name="TechSupport" value="No">
+            </div>
+
+            <div class="form-group">
+              <label for="OnlineSecurity">Online Security</label>
+              <div class="toggle-group" id="OnlineSecurityToggle">
+                <button type="button" class="toggle-opt selected" data-val="No" onclick="setToggle('OnlineSecurity','No',this)">No</button>
+                <button type="button" class="toggle-opt" data-val="Yes" onclick="setToggle('OnlineSecurity','Yes',this)">Yes</button>
+              </div>
+              <input type="hidden" id="OnlineSecurity" name="OnlineSecurity" value="No">
+            </div>
+
+            <div class="sidebar-section-title">💳 Billing</div>
+
+            <div class="form-group">
+              <label for="PaymentMethod">Payment Method</label>
+              <select id="PaymentMethod" name="PaymentMethod">
+                <option value="Electronic check">Electronic check</option>
+                <option value="Mailed check">Mailed check</option>
+                <option value="Bank transfer (automatic)">Bank transfer (auto)</option>
+                <option value="Credit card (automatic)">Credit card (auto)</option>
+              </select>
+            </div>
+
+            <!-- Hidden defaults -->
+            <input type="hidden" name="DeviceProtection" value="No">
+            <input type="hidden" name="OnlineBackup" value="No">
+            <input type="hidden" name="StreamingTV" value="No">
+            <input type="hidden" name="StreamingMovies" value="No">
+            <input type="hidden" name="PaperlessBilling" value="Yes">
+            <input type="hidden" name="Partner" value="No">
+            <input type="hidden" name="Dependents" value="No">
+            <input type="hidden" name="PhoneService" value="Yes">
+            <input type="hidden" name="MultipleLines" value="No">
+            <input type="hidden" name="gender" value="Female">
+            <input type="hidden" name="SeniorCitizen" value="0">
+
+            <button type="submit" class="primary-btn" id="analyzeBtn">
+              ⚡ Analyze Customer
+            </button>
+            <div class="loading-state" id="loadingState">
+              <div class="spinner"></div>
+              Running AI model...
+            </div>
+          </form>
+        </aside>
+
+        <!-- Main Results Panel -->
+        <main class="predict-main" id="predictMain">
+
+          <!-- Placeholder -->
+          <div class="placeholder-state" id="predictPlaceholder">
+            <div class="placeholder-icon">🔮</div>
+            <div class="placeholder-text">Fill in the customer profile and click <strong>Analyze Customer</strong> to generate churn prediction and AI recommendations.</div>
+          </div>
+
+          <!-- Results (hidden until prediction) -->
+          <div id="predictResults" class="hidden">
+            <div class="predict-results-grid">
+
+              <!-- Gauge Card -->
+              <div class="result-card highlight" id="gaugeCard">
+                <div class="card-title">🎯 Churn Risk Score</div>
+                <div class="gauge-container">
+                  <div class="gauge-wrap">
+                    <canvas id="gaugeChart" width="200" height="110"></canvas>
+                    <div class="gauge-center-text">
+                      <div class="gauge-pct" id="gaugePct">0%</div>
+                      <div class="gauge-label">Churn Prob.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="risk-row">
+                  <span style="font-size:0.82rem;color:var(--text-secondary)">Risk Level</span>
+                  <div class="risk-badge-lg risk-low" id="riskBadge">
+                    <div class="pulse-ring"></div>
+                    <span id="riskText">Low Risk</span>
+                  </div>
+                </div>
+
+                <div class="confidence-bar-wrap">
+                  <div class="confidence-labels">
+                    <span>Model Confidence</span>
+                    <span id="confidenceVal">--</span>
+                  </div>
+                  <div class="confidence-bar-bg">
+                    <div class="confidence-bar-fill" id="confidenceFill" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SHAP Chart Card -->
+              <div class="result-card" id="shapCard">
+                <div class="card-title">📊 Top Risk Factors (SHAP)</div>
+                <div style="flex:1;min-height:200px;position:relative">
+                  <canvas id="shapChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recommendation Card -->
+            <div class="rec-card" id="recCard">
+              <div class="rec-header">
+                <div class="rec-icon" id="recIcon">💡</div>
+                <div>
+                  <div class="rec-title">AI Recommendation</div>
+                  <div class="rec-sub">Generated by decision engine based on risk profile</div>
+                </div>
+                <div style="margin-left:auto">
+                  <span class="tag" id="urgencyTag">Analyzing...</span>
+                </div>
+              </div>
+              <div class="rec-action" id="recAction">Waiting for analysis...</div>
+              <div class="rec-reason">
+                <span>🔍</span>
+                <span id="recReason">Submit the form to see the decision logic.</span>
+              </div>
+              <button class="export-btn" id="exportPdfBtn" onclick="exportToPdf()">
+                📄 Export Report as PDF
+              </button>
+            </div>
+          </div>
+
+        </main>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════
+         TAB 3: BATCH ANALYSIS
+         ════════════════════════════════ -->
+    <div class="tab-panel" id="panel-batch" role="tabpanel">
+      <div class="batch-layout">
+
+        <!-- Upload Zone -->
+        <div class="upload-zone" id="uploadZone">
+          <input type="file" id="fileInput" accept=".csv">
+          <div class="upload-icon">📂</div>
+          <div class="upload-title">Drag & Drop your CSV file here</div>
+          <div class="upload-sub">Upload a CSV with customer data to predict churn for multiple records at once</div>
+          <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+            📤 Choose CSV File
+          </button>
+          <div id="fileNameLabel" style="margin-top:12px;font-size:0.82rem;color:var(--text-secondary)"></div>
+        </div>
+
+        <!-- CSV Format Hint -->
+        <div class="format-hint">
+          <div class="format-hint-title">📋 Required CSV Columns</div>
+          <code>customerID, Contract, tenure, MonthlyCharges, TotalCharges, InternetService, TechSupport, OnlineSecurity, PaymentMethod</code>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="batch-progress" id="batchProgress">
+          <div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--text-secondary)">
+            <span id="progressLabel">Processing...</span>
+            <span id="progressPct">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Summary Cards (hidden until batch done) -->
+        <div class="batch-summary-grid hidden" id="batchSummary">
+          <div class="summary-card">
+            <div class="summary-label">Total Processed</div>
+            <div class="summary-value" id="bSum-total">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Critical Risk</div>
+            <div class="summary-value critical" id="bSum-critical">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">High Risk</div>
+            <div class="summary-value high" id="bSum-high">0</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Safe (Low)</div>
+            <div class="summary-value success" id="bSum-low">0</div>
+          </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="batch-results-card hidden" id="batchResultsCard">
+          <div class="batch-header">
+            <div class="section-title" style="margin-bottom:0">📋 Batch Results</div>
+            <div class="batch-actions">
+              <button class="export-btn" onclick="exportBatchCSV()">⬇️ Export CSV</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="batchTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Customer ID</th>
+                  <th>Contract</th>
+                  <th>Tenure</th>
+                  <th>Monthly ($)</th>
+                  <th>Churn Prob.</th>
+                  <th>Risk</th>
+                  <th>Recommended Action</th>
+                </tr>
+              </thead>
+              <tbody id="batchBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════
+         TAB 4: INSIGHTS
+         ════════════════════════════════ -->
+    <div class="tab-panel" id="panel-insights" role="tabpanel">
+      <div class="insights-layout">
+
+        <div class="insights-grid">
+          <!-- Feature Importance Chart -->
+          <div class="chart-card">
+            <div class="chart-card-title">🏆 Global Feature Importance (Top 12)</div>
+            <div class="chart-wrapper" style="min-height:320px">
+              <canvas id="featureImportanceChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Model Metrics -->
+          <div class="chart-card">
+            <div class="chart-card-title">📈 Model Performance Metrics</div>
+            <div class="model-metrics-grid" id="metricsGrid">
+              <div class="metric-card">
+                <div class="metric-value" id="mAccuracy">--</div>
+                <div class="metric-label">Accuracy</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value" id="mPrecision">--</div>
+                <div class="metric-label">Precision</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value" id="mRecall">--</div>
+                <div class="metric-label">Recall</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value" id="mF1">--</div>
+                <div class="metric-label">F1 Score</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value" id="mAUC">--</div>
+                <div class="metric-label">AUC-ROC</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-value" id="mFeatures">--</div>
+                <div class="metric-label">Features</div>
+              </div>
+            </div>
+
+            <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+              <div style="font-size:0.78rem;color:var(--text-secondary)">Model Details</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.82rem">
+                <div style="color:var(--text-secondary)">Algorithm</div>
+                <div id="mAlgorithm" style="color:var(--text-primary);font-weight:500">--</div>
+                <div style="color:var(--text-secondary)">Explainability</div>
+                <div id="mExplain" style="color:var(--text-primary);font-weight:500">--</div>
+                <div style="color:var(--text-secondary)">Training Size</div>
+                <div id="mTraining" style="color:var(--text-primary);font-weight:500">--</div>
+                <div style="color:var(--text-secondary)">Last Trained</div>
+                <div id="mDate" style="color:var(--text-primary);font-weight:500">--</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pipeline Diagram -->
+        <div class="chart-card">
+          <div class="chart-card-title">⚙️ Model Architecture Pipeline</div>
+          <div class="pipeline">
+            <div class="pipeline-step">
+              <div class="pipeline-node">📥<span style="font-size:0.6rem;color:var(--text-muted)">CSV</span></div>
+              <div class="pipeline-node-label">Raw Data</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-node">🔧<span style="font-size:0.6rem;color:var(--text-muted)">SKL</span></div>
+              <div class="pipeline-node-label">Preprocessing</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-node">🔢<span style="font-size:0.6rem;color:var(--text-muted)">ENC</span></div>
+              <div class="pipeline-node-label">Feature Eng.</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-node">🤖<span style="font-size:0.6rem;color:var(--text-muted)">XGB</span></div>
+              <div class="pipeline-node-label">XGBoost Model</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-node">📊<span style="font-size:0.6rem;color:var(--text-muted)">SHAP</span></div>
+              <div class="pipeline-node-label">Explainability</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-node">⚡<span style="font-size:0.6rem;color:var(--text-muted)">API</span></div>
+              <div class="pipeline-node-label">Decision Engine</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-node">🎯<span style="font-size:0.6rem;color:var(--text-muted)">OUT</span></div>
+              <div class="pipeline-node-label">Risk Score + Recs</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /app-body -->
+
+  <!-- JS Modules -->
+  <script src="/static/js/charts.js"></script>
+  <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/predict.js"></script>
+  <script src="/static/js/batch.js"></script>
+  <script src="/static/js/insights.js"></script>
+
+  <script>
+    // ─── Tab Routing ───
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+
+      document.getElementById('tab-' + tab).classList.add('active');
+      document.getElementById('tab-' + tab).setAttribute('aria-selected', 'true');
+      document.getElementById('panel-' + tab).classList.add('active');
+
+      // Lazy-load tab content
+      if (tab === 'insights' && !window._insightsLoaded) {
+        loadInsights();
+        window._insightsLoaded = true;
+      }
+    }
+
+    // ─── Toggle Button Helper ───
+    function setToggle(fieldId, value, btn) {
+      document.getElementById(fieldId).value = value;
+      const parent = btn.closest('.toggle-group');
+      parent.querySelectorAll('.toggle-opt').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    }
+
+    // ─── Init ───
+    document.addEventListener('DOMContentLoaded', () => {
+      loadDashboard();
+    });
+  </script>
+
+</body>
+</html>
