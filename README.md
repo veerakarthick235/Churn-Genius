@@ -309,7 +309,7 @@ The `decision_engine.py` maps churn probability thresholds to risk tiers and the
 
 **Veera Karthick**  
 AI & Data Science Engineer  
-[GitHub](https://github.com/veerakarthick235) · [LinkedIn](https://linkedin.com/in/veerakarthick235)
+[GitHub](https://github.com/veerakarthick235) · [LinkedIn](https://www.linkedin.com/in/karthickkumar-s-b04a10348/)
 
 ---
 
